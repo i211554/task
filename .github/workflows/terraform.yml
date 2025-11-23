@@ -4,15 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'modules/**/*.tf'
+      - '*.tf'
 
 jobs:
   terraform-check:
     name: Terraform Validation
     runs-on: ubuntu-latest
-
-    env:
-      # Prevent Terraform from trying to access AWS or Backend
-      TF_CLI_ARGS_init: "-backend=false"
 
     steps:
       - name: Checkout code
@@ -40,7 +39,18 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init (Backend disabled)
+      # -------------------------------------------------------
+      # NEW: Configure AWS Credentials for the GitHub Runner
+      # -------------------------------------------------------
+      - name: Configure AWS Credentials
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION}}
+
+      - name: Terraform Init
         if: steps.check_changes.outputs.has_changes == 'true'
         run: terraform init
 
@@ -48,14 +58,14 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         run: terraform validate
 
-      - name: Terraform Plan (No backend, no refresh)
+      - name: Terraform Plan (Output Only)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "=========================================="
-          echo "TERRAFORM PLAN - DRY RUN ONLY"
-          echo "NO BACKEND. NO AWS COMMUNICATION."
+          echo "TERRAFORM PLAN - **DRY RUN ONLY**"
+          echo "NO CHANGES WILL BE APPLIED AUTOMATICALLY"
           echo "=========================================="
-          terraform plan -no-color -refresh=false -lock=false
+          terraform plan -no-color
           echo "=========================================="
-          echo "Plan completed safely."
+          echo "Plan complete."
           echo "=========================================="
