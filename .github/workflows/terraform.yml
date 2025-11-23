@@ -4,14 +4,15 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'modules/**/*.tf'
-      - '*.tf'
 
 jobs:
   terraform-check:
     name: Terraform Validation
     runs-on: ubuntu-latest
+
+    env:
+      # Prevent Terraform from trying to access AWS or Backend
+      TF_CLI_ARGS_init: "-backend=false"
 
     steps:
       - name: Checkout code
@@ -39,7 +40,7 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init
+      - name: Terraform Init (Backend disabled)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: terraform init
 
@@ -47,14 +48,14 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         run: terraform validate
 
-      - name: Terraform Plan (Output Only)
+      - name: Terraform Plan (No backend, no refresh)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "=========================================="
-          echo "TERRAFORM PLAN - **DRY RUN ONLY**"
-          echo "NO CHANGES WILL BE APPLIED AUTOMATICALLY"
+          echo "TERRAFORM PLAN - DRY RUN ONLY"
+          echo "NO BACKEND. NO AWS COMMUNICATION."
           echo "=========================================="
-          terraform plan -no-color
+          terraform plan -no-color -refresh=false -lock=false
           echo "=========================================="
-          echo "Plan complete."
+          echo "Plan completed safely."
           echo "=========================================="
