@@ -1,0 +1,60 @@
+name: Terraform CI (Validation Only)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/**/*.tf'
+      - '*.tf'
+
+jobs:
+  terraform-check:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+
+      - name: Detect Terraform file changes
+        id: check_changes
+        run: |
+          echo "Checking for Terraform file changes..."
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep -E '\.tf$' || true)
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No .tf changes detected."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Terraform files changed:"
+            echo "$CHANGED_FILES"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Terraform
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: terraform init
+
+      - name: Terraform Validate
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: terraform validate
+
+      - name: Terraform Plan (Output Only)
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "=========================================="
+          echo "TERRAFORM PLAN - **DRY RUN ONLY**"
+          echo "NO CHANGES WILL BE APPLIED AUTOMATICALLY"
+          echo "=========================================="
+          terraform plan -no-color
+          echo "=========================================="
+          echo "Plan complete."
+          echo "=========================================="
